@@ -1,43 +1,42 @@
 /**
- * Feature gating.
+ * Pricing.
  *
- * Billing is off by default: with BILLING_ENABLED unset, every Pro capability
- * is available to everyone and the pricing page says so. Flipping the flag on
- * turns the same list into an upgrade prompt, so the paywall can be switched on
- * later without touching the editor.
+ * Smart Stamp is priced per signature, not per month: an email signature is
+ * something most people set up once, and a subscription for that is a bad deal
+ * dressed up as a plan. Building, previewing and switching templates is free —
+ * you pay to take a finished signature away.
+ *
+ * `BILLING_ENABLED` is the master switch. Left off (the default) everything is
+ * free for everyone and the pricing page says so, so the paywall can be turned
+ * on later without touching the editor.
  */
 
 import type { User } from "./store";
 
-export const PRO_FEATURES = [
-  "unlimited-signatures",
-  "banner",
-  "video",
-  "qr",
-  "badges",
-  "buttons",
-  "custom-fields",
-  "disclaimer",
-  "remove-branding",
-] as const;
+/** Price in the smallest currency unit, so there is no floating point money. */
+export const PRICE_PER_SIGNATURE_CENTS = 1000;
+export const CURRENCY = "USD";
 
-export type ProFeature = (typeof PRO_FEATURES)[number];
-
-export const FREE_SIGNATURE_LIMIT = 3;
+export function formatPrice(cents: number = PRICE_PER_SIGNATURE_CENTS): string {
+  return `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
+}
 
 export function billingEnabled(): boolean {
   return process.env.BILLING_ENABLED === "true";
 }
 
-export function isPro(user: Pick<User, "plan"> | null): boolean {
+/**
+ * Whether a signature can be exported — copied, downloaded or shared.
+ *
+ * Everything up to this point is free, which is what lets someone see exactly
+ * what they are buying before they pay for it.
+ */
+export function canExport(signature: { paid?: boolean } | null): boolean {
   if (!billingEnabled()) return true;
-  return user?.plan === "pro";
+  return Boolean(signature?.paid);
 }
 
-export function canUse(user: Pick<User, "plan"> | null, _feature: ProFeature): boolean {
-  return isPro(user);
-}
-
-export function signatureLimit(user: Pick<User, "plan"> | null): number {
-  return isPro(user) ? Number.POSITIVE_INFINITY : FREE_SIGNATURE_LIMIT;
+/** Saved signatures are unlimited: the charge is per signature, not per seat. */
+export function signatureLimit(_user: Pick<User, "plan"> | null): number {
+  return Number.POSITIVE_INFINITY;
 }

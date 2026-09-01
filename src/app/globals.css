@@ -142,3 +142,71 @@ input[type="color"]::-moz-color-swatch {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Stamp motif
+   ---------------------------------------------------------------------------
+   Perforations are painted as circles in the surrounding surface colour, sitting
+   on top of the card's edges — so they read as holes bitten out of it. Done this
+   way rather than with a CSS mask because mask compositing needed to subtract
+   shapes is still inconsistent across browsers, and this degrades to a plain
+   card if anything goes wrong.
+
+   Set --perf to whatever the card sits on. */
+.stamp {
+  --perf: #ffffff;
+  --perf-r: 6px;
+  --perf-step: 20px;
+  position: relative;
+  margin: var(--perf-r);
+  background: #fff;
+  border-radius: 3px;
+}
+
+.stamp::before,
+.stamp::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: calc(var(--perf-r) * 2);
+  background:
+    radial-gradient(circle var(--perf-r) at var(--perf-r) var(--perf-r), var(--perf) 98%, transparent 100%)
+    0 0 / var(--perf-step) calc(var(--perf-r) * 2) repeat-x;
+  pointer-events: none;
+}
+.stamp::before { top: calc(var(--perf-r) * -1); }
+.stamp::after { bottom: calc(var(--perf-r) * -1); }
+
+/* The vertical edges need their own pair of strips. */
+.stamp > .stamp-sides::before,
+.stamp > .stamp-sides::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: calc(var(--perf-r) * 2);
+  background:
+    radial-gradient(circle var(--perf-r) at var(--perf-r) var(--perf-r), var(--perf) 98%, transparent 100%)
+    0 0 / calc(var(--perf-r) * 2) var(--perf-step) repeat-y;
+  pointer-events: none;
+  z-index: 1;
+}
+.stamp > .stamp-sides::before { left: calc(var(--perf-r) * -1); }
+.stamp > .stamp-sides::after { right: calc(var(--perf-r) * -1); }
+
+/* A postmark: the smudged circular cancellation over a stamp. */
+.postmark {
+  border: 2px solid currentColor;
+  border-radius: 9999px;
+  opacity: 0.28;
+  transform: rotate(-14deg);
+}
+
+/* Perforated rule, used to separate sections instead of a plain line. */
+.perf-rule {
+  height: 2px;
+  background-image: radial-gradient(circle 2px at 2px 1px, var(--color-ink-300) 99%, transparent 100%);
+  background-size: 12px 2px;
+  background-repeat: repeat-x;
+}

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { SignatureFrame } from "@/components/SignatureFrame";
+import { ScaledSignature } from "@/components/ScaledSignature";
 import { MAIL_CLIENTS } from "@/lib/guides";
 
 /**
@@ -68,7 +68,7 @@ export function SharedSignature({
   return (
     <>
       <div className="mt-8 overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-sm">
-        <SignatureFrame html={html} padding={26} title={`${who}'s signature`} />
+        <ScaledSignature html={html} naturalWidth={560} padding={22} title={`${who}'s signature`} />
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">

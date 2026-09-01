@@ -17,6 +17,7 @@ export function SignatureFrame({
   className = "",
   title = "Signature preview",
   interactive = true,
+  onMeasure,
 }: {
   html: string;
   background?: string;
@@ -26,9 +27,16 @@ export function SignatureFrame({
   /** Set false when the frame sits inside a clickable card — an iframe
       captures pointer events and would otherwise eat the click. */
   interactive?: boolean;
+  /** Reports content height, so a parent can scale the frame to fit. */
+  onMeasure?: (height: number) => void;
 }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(140);
+
+  // Held in a ref so a caller passing an inline callback does not re-run the
+  // measurement effect on every render.
+  const onMeasureRef = useRef(onMeasure);
+  onMeasureRef.current = onMeasure;
 
   const doc = `<!DOCTYPE html><html><head><meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -48,6 +56,7 @@ export function SignatureFrame({
       // scrollHeight settles only after images load, so this runs on load too.
       const next = Math.max(60, Math.ceil(body.scrollHeight));
       setHeight((prev) => (Math.abs(prev - next) > 1 ? next : prev));
+      onMeasureRef.current?.(next);
     };
 
     measure();

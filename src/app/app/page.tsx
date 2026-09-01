@@ -8,7 +8,7 @@ import { currentUser } from "@/lib/session";
 import { resolveOrigin } from "@/lib/origin";
 import { listSignatures, storageIsEphemeral } from "@/lib/store";
 import { renderSignatureHtml } from "@/lib/signature/render";
-import { billingEnabled, isPro, FREE_SIGNATURE_LIMIT } from "@/lib/billing";
+import { billingEnabled, formatPrice } from "@/lib/billing";
 import { TEMPLATES } from "@/lib/signature/templates";
 
 export const metadata: Metadata = { title: "My signatures" };
@@ -18,7 +18,6 @@ export default async function DashboardPage() {
   if (!user) redirect("/login?next=/app");
 
   const [origin, signatures] = await Promise.all([resolveOrigin(), listSignatures(user.id)]);
-  const atLimit = !isPro(user) && signatures.length >= FREE_SIGNATURE_LIMIT;
 
   return (
     <>
@@ -34,9 +33,7 @@ export default async function DashboardPage() {
               {signatures.length === 0
                 ? "You have not saved a signature yet."
                 : `${signatures.length} saved signature${signatures.length === 1 ? "" : "s"}.`}
-              {billingEnabled() && !isPro(user)
-                ? ` Free plan — ${FREE_SIGNATURE_LIMIT} saved signatures included.`
-                : ""}
+              {billingEnabled() ? ` Building is free; ${formatPrice()} per signature to export.` : ""}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -49,21 +46,12 @@ export default async function DashboardPage() {
                 Sign out
               </button>
             </form>
-            {atLimit ? (
-              <Link
-                href="/pricing"
-                className="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-500"
-              >
-                Upgrade for more
-              </Link>
-            ) : (
-              <Link
-                href="/app/editor/new"
-                className="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-500"
-              >
-                New signature
-              </Link>
-            )}
+            <Link
+              href="/app/editor/new"
+              className="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-500"
+            >
+              New signature
+            </Link>
           </div>
         </div>
 

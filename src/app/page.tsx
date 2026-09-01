@@ -1,15 +1,16 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
-import { SignatureFrame } from "@/components/SignatureFrame";
+import { ScaledSignature } from "@/components/ScaledSignature";
 import { currentUser } from "@/lib/session";
 import { resolveOrigin } from "@/lib/origin";
 import { sampleDraft, toSignature } from "@/lib/signature/defaults";
+import { showcaseDraft } from "@/lib/signature/gallery";
 import { renderSignatureHtml } from "@/lib/signature/render";
 import { MAIL_CLIENTS } from "@/lib/guides";
 import { TEMPLATES } from "@/lib/signature/templates";
 import { NETWORKS } from "@/lib/signature/networks";
-import { billingEnabled } from "@/lib/billing";
+import { billingEnabled, formatPrice } from "@/lib/billing";
 
 export default async function HomePage() {
   const [user, origin] = await Promise.all([currentUser(), resolveOrigin()]);
@@ -17,17 +18,13 @@ export default async function HomePage() {
   const hero = toSignature(sampleDraft(origin), { id: "demo-hero", ownerId: null, slug: "demo" });
   const heroHtml = renderSignatureHtml(hero, { origin });
 
-  const showcase = ["accent-edge", "elegant", "mono-tech"].map((templateId) => {
-    const draft = sampleDraft(origin);
+  const showcase = ["elegant", "mono-tech", "split-card"].map((templateId) => {
     const meta = TEMPLATES.find((t) => t.id === templateId)!;
-    const sig = toSignature(
-      {
-        ...draft,
-        style: { ...draft.style, templateId, ...styleTweaksFor(templateId) },
-        addons: { ...draft.addons, meeting: { ...draft.addons.meeting, enabled: false } },
-      },
-      { id: `demo-${templateId}`, ownerId: null, slug: `demo-${templateId}` },
-    );
+    const sig = toSignature(showcaseDraft(templateId, origin), {
+      id: `demo-${templateId}`,
+      ownerId: null,
+      slug: `demo-${templateId}`,
+    });
     return { meta, html: renderSignatureHtml(sig, { origin }) };
   });
 
@@ -76,12 +73,12 @@ export default async function HomePage() {
 
               <p className="mt-5 text-sm text-ink-400">
                 {billingEnabled()
-                  ? "Free to build and copy. No credit card to get started."
-                  : "Completely free. No account needed to build and copy one."}
+                  ? `${formatPrice()} per signature, paid once. Free to build and preview — you only pay to take it away.`
+                  : "Free while we are in preview. No account needed to build and copy one."}
               </p>
             </div>
 
-            <div className="relative">
+            <div className="relative isolate overflow-hidden">
               <div
                 className="absolute -inset-6 rounded-[2rem] bg-gradient-to-tr from-brand-500/25 via-transparent to-glow-500/25 blur-2xl"
                 aria-hidden="true"
@@ -101,7 +98,7 @@ export default async function HomePage() {
                   </p>
                   <p className="mt-3 leading-relaxed text-ink-700">Best,</p>
                 </div>
-                <SignatureFrame html={heroHtml} padding={24} title="Example signature" />
+                <ScaledSignature html={heroHtml} naturalWidth={560} padding={22} title="Example signature" />
               </div>
             </div>
           </div>
@@ -157,15 +154,26 @@ export default async function HomePage() {
 
             <div className="mt-14 grid gap-6 lg:grid-cols-3">
               {showcase.map((item) => (
-                <div
-                  key={item.meta.id}
-                  className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-sm"
-                >
-                  <div className="border-b border-ink-100 px-5 py-3.5">
-                    <h3 className="text-sm font-semibold text-ink-900">{item.meta.name}</h3>
-                    <p className="mt-0.5 line-clamp-1 text-xs text-ink-400">{item.meta.description}</p>
+                <div key={item.meta.id} className="min-w-0">
+                  <div
+                    className="stamp shadow-[0_2px_14px_rgba(15,23,42,0.09)]"
+                    style={{ ["--perf" as string]: "#f4f6fb" }}
+                  >
+                    <span className="stamp-sides" aria-hidden="true" />
+                    <div className="overflow-hidden px-3 py-3">
+                      <ScaledSignature
+                        html={item.html}
+                        naturalWidth={560}
+                        maxHeight={215}
+                        padding={10}
+                        title={`${item.meta.name} template`}
+                      />
+                    </div>
                   </div>
-                  <SignatureFrame html={item.html} padding={22} title={`${item.meta.name} template`} />
+                  <div className="mt-4 px-1">
+                    <h3 className="text-[15px] font-semibold text-ink-900">{item.meta.name}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-ink-500">{item.meta.description}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -231,18 +239,6 @@ export default async function HomePage() {
       <SiteFooter />
     </>
   );
-}
-
-/** Small per-template adjustments so the showcase reads as three distinct looks. */
-function styleTweaksFor(templateId: string) {
-  switch (templateId) {
-    case "elegant":
-      return { fontFamily: "georgia", primaryColor: "#78350f", accentColor: "#d97706", linkColor: "#b45309", iconStyle: "dark" as const, iconShape: "plain" as const };
-    case "mono-tech":
-      return { primaryColor: "#14532d", accentColor: "#16a34a", linkColor: "#16a34a", iconStyle: "dark" as const, iconShape: "rounded" as const };
-    default:
-      return {};
-  }
 }
 
 function FauxField({ label, value }: { label: string; value: string }) {

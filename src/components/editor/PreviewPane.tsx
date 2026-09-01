@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { SignatureFrame } from "@/components/SignatureFrame";
+import { ScaledSignature } from "@/components/ScaledSignature";
 import { MAIL_CLIENTS } from "@/lib/guides";
 import { estimateSize, renderPlainText, renderStandaloneHtml } from "@/lib/signature/render";
 import type { Signature } from "@/lib/signature/types";
@@ -165,7 +165,12 @@ export function PreviewPane({
               </button>
             </div>
           ) : (
-            <SignatureFrame html={html} background={frameBackground} padding={24} />
+            <ScaledSignature
+              html={html}
+              naturalWidth={signature.style.maxWidth + 48}
+              background={frameBackground}
+              padding={24}
+            />
           )}
         </div>
 
