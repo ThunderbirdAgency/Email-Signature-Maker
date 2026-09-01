@@ -9,7 +9,7 @@ import { NETWORKS } from "@/lib/signature/networks";
 
 export const metadata: Metadata = {
   title: "Pricing",
-  description: "What Signaturely costs, and what you get.",
+  description: "What Smart Stamp costs, and what you get.",
 };
 
 export default async function PricingPage() {
@@ -76,7 +76,7 @@ export default async function PricingPage() {
                   "Promo banners and CTA buttons",
                   "QR codes and video cards",
                   "Legal disclaimers and badges",
-                  "No Signaturely mention in your signature",
+                  "No Smart Stamp mention in your signature",
                 ]}
               />
             ) : null}

@@ -1,7 +1,7 @@
-# Signaturely
+# Smart Stamp
 
-An email signature builder. Type in your details, pick a look, copy the result
-into Gmail, Outlook, Apple Mail or anywhere else.
+An email signature builder at **getsmartstamp.com**. Type in your details, pick
+a look, copy the result into Gmail, Outlook, Apple Mail or anywhere else.
 
 A marketing site sits at `/`, and the product itself is at `/app`.
 
@@ -29,7 +29,8 @@ npm start
 | --- | --- | --- |
 | `AUTH_SECRET` | in production | Signs the session cookie. Must be 32+ characters: `openssl rand -hex 32`. Development falls back to an insecure constant. |
 | `NEXT_PUBLIC_APP_URL` | in production | The public origin, e.g. `https://sig.example.com`. Every image inside a signature is hot-linked from here by the recipient's mail client, so it must be publicly reachable. Falls back to the request's own host. |
-| `DATA_DIR` | no | Where accounts, signatures and uploads live. Defaults to `./.data`. |
+| `DATABASE_URL` | for durable data | Postgres connection string. Set it and the app stores everything in Postgres; leave it unset and it falls back to the filesystem. |
+| `DATA_DIR` | no | Where the filesystem fallback keeps its data. Defaults to `./.data`. |
 | `BILLING_ENABLED` | no | `false` (default) makes every feature free for everyone. `true` turns the same feature list into a paywall. |
 
 ---
@@ -50,9 +51,13 @@ src/lib/signature/     the rendering engine — no React, no server dependencies
 src/lib/
   icons.ts             server-only: brand marks → PNG via sharp
   icon-url.ts          icon URL building, safe for the client bundle
-  store.ts             persistence (JSON document + blob directory)
   session.ts           cookie sessions
   guides.ts            per-client install instructions
+  store/
+    shared.ts          the driver interface, ids and password hashing
+    postgres.ts        Postgres driver (used when DATABASE_URL is set)
+    file.ts            filesystem driver (the zero-config fallback)
+    index.ts           picks one and re-exports it
 
 src/app/               routes; src/components/  UI
 ```
@@ -89,15 +94,27 @@ holding the URL can view the image**. Uploads are unguessable but not private.
 
 ### Storage
 
-`src/lib/store.ts` keeps everything in one JSON document plus a blob directory,
-written atomically and serialised behind an in-process lock. That is a
-deliberate choice for a service of this size: it makes the app runnable from a
-fresh clone with no setup.
+Two drivers behind one interface, chosen at startup by whether `DATABASE_URL`
+is set. Nothing outside `src/lib/store/` knows which is in use.
 
-It assumes a single process with a persistent disk. Before running multiple
-instances, or deploying somewhere with an ephemeral filesystem, reimplement that
-one module against a real database and object store — every call site goes
-through its interface, and nothing else needs to change.
+**Postgres** (`DATABASE_URL` set) is what production runs on. A signature is
+stored as the same JSON document the renderer consumes, with only the queried
+fields — owner, slug, name, timestamps — lifted into columns, so adding a field
+to a signature never needs a migration. Image bytes live in `uploads.data` as
+`bytea` rather than in an object store: they are small, capped at 1200px, and
+always fetched one at a time by id, which keeps the whole service on a single
+external dependency.
+
+Every table has row level security enabled with no policies. All access goes
+through this app's own API, which does its own authorization; RLS with no
+policies means Supabase's anon and publishable keys can reach none of it.
+
+**Filesystem** (no `DATABASE_URL`) keeps everything in one JSON document plus a
+blob directory, written atomically and serialised behind an in-process lock.
+It exists so the app runs from a fresh clone with nothing to provision. It
+assumes a single process with a persistent disk, and reports itself as
+ephemeral on serverless hosts so the dashboard can warn rather than quietly
+lose someone's work.
 
 ---
 
@@ -110,18 +127,21 @@ how much of it works:
 | --- | --- |
 | nothing | The marketing site, all templates, the full editor, live preview, copy/download and the install guides. Sign-up returns a clear "not available" message. |
 | `AUTH_SECRET` | Accounts, saved signatures, share links and image uploads. |
-| `DATA_DIR` | Durable storage. Without it on a serverless host, data goes to the temp directory and disappears — the dashboard says so. |
+| `DATABASE_URL` | Data that actually persists. |
 
 ### Vercel
 
-Import the repo, then add `AUTH_SECRET` (`openssl rand -hex 32`) under Settings →
-Environment Variables and redeploy.
+Import the repo and set both variables under Settings → Environment Variables:
 
-Vercel's filesystem is read-only apart from `/tmp`, so accounts and uploads work
-but do not persist. For anything real, replace `src/lib/store.ts` with a database
-and object-store implementation — every call site already goes through its
-interface — or run the app on a host with a persistent disk and point `DATA_DIR`
-at it.
+- `AUTH_SECRET` — `openssl rand -hex 32`
+- `DATABASE_URL` — a Postgres connection string. On Supabase take the
+  **transaction pooler** URI (port 6543), which is built for serverless; the
+  driver disables prepared statements and holds one connection per instance to
+  suit it. TLS is required automatically for any non-local host.
+
+Then redeploy. Without `DATABASE_URL` the app still runs, but Vercel's
+filesystem is read-only apart from `/tmp`, so saved data disappears and the
+dashboard says so.
 
 ---
 

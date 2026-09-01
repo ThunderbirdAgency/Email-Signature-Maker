@@ -65,8 +65,12 @@ export async function destroySession(): Promise<void> {
 
 /** The signed-in user, or null. Safe to call from any server component. */
 export async function currentUser(): Promise<User | null> {
-  if (!authConfigured()) return null;
+  // Read cookies before anything can return early. `cookies()` is what marks a
+  // route as dynamic, and skipping it let Next prerender the signed-out result
+  // at build time — which produced a permanent redirect to the sign-in page
+  // even for a request carrying a valid session.
   const store = await cookies();
+  if (!authConfigured()) return null;
   const token = store.get(COOKIE_NAME)?.value;
   if (!token) return null;
   try {

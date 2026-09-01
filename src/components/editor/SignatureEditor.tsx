@@ -29,7 +29,7 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-const LOCAL_KEY = "signaturely:draft";
+const LOCAL_KEY = "smartstamp:draft";
 
 export function SignatureEditor({
   initialDraft,
@@ -183,7 +183,7 @@ export function SignatureEditor({
         <div className="flex min-w-0 items-center gap-3">
           <Link href="/" className="flex shrink-0 items-center gap-2">
             <Logo className="h-7 w-7" />
-            <span className="hidden text-sm font-semibold tracking-tight sm:inline">Signaturely</span>
+            <span className="hidden text-sm font-semibold tracking-tight sm:inline">Smart Stamp</span>
           </Link>
           <span className="hidden h-5 w-px bg-ink-200 sm:block" />
           <input

@@ -9,7 +9,7 @@ export function SiteFooter() {
         <div>
           <div className="flex items-center gap-2.5">
             <Logo className="h-7 w-7" />
-            <span className="font-semibold tracking-tight">Signaturely</span>
+            <span className="font-semibold tracking-tight">Smart Stamp</span>
           </div>
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-ink-500">
             A modern email signature generator. Build it once, paste it anywhere, look

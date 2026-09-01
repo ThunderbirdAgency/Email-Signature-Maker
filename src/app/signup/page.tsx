@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { AuthShell, safeNext } from "../login/page";
+import { AuthShell, safeNext } from "@/components/site/AuthShell";
 import { currentUser } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Create an account" };
