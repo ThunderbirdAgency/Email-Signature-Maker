@@ -9,6 +9,7 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import crypto from "node:crypto";
 import type { Signature, SignatureDraft } from "./signature/types";
 
@@ -37,7 +38,28 @@ interface Database {
   uploads: UploadMeta[];
 }
 
-const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), ".data");
+/**
+ * Where data lives.
+ *
+ * Serverless hosts give you a read-only filesystem apart from the temp
+ * directory, so writing beside the source would fail outright there. Falling
+ * back to temp keeps a deployment fully usable for evaluation — but that
+ * storage is per-instance and disappears, which `storageIsEphemeral` reports so
+ * the UI can say so rather than quietly losing someone's work.
+ */
+function resolveDataDir(): string {
+  if (process.env.DATA_DIR) return process.env.DATA_DIR;
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    return path.join(os.tmpdir(), "signaturely");
+  }
+  return path.join(process.cwd(), ".data");
+}
+
+export function storageIsEphemeral(): boolean {
+  return !process.env.DATA_DIR && Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+}
+
+const DATA_DIR = resolveDataDir();
 const DB_PATH = path.join(DATA_DIR, "db.json");
 const BLOB_DIR = path.join(DATA_DIR, "uploads");
 

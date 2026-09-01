@@ -6,7 +6,7 @@ import { SignatureFrame } from "@/components/SignatureFrame";
 import { DeleteSignatureButton } from "@/components/app/DeleteSignatureButton";
 import { currentUser } from "@/lib/session";
 import { resolveOrigin } from "@/lib/origin";
-import { listSignatures } from "@/lib/store";
+import { listSignatures, storageIsEphemeral } from "@/lib/store";
 import { renderSignatureHtml } from "@/lib/signature/render";
 import { billingEnabled, isPro, FREE_SIGNATURE_LIMIT } from "@/lib/billing";
 import { TEMPLATES } from "@/lib/signature/templates";
@@ -66,6 +66,16 @@ export default async function DashboardPage() {
             )}
           </div>
         </div>
+
+        {storageIsEphemeral() ? (
+          <p className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">
+            <strong className="font-semibold">Temporary storage.</strong> This deployment
+            has no database configured, so saved signatures live on the server&rsquo;s
+            temporary disk and will disappear. Copy anything you want to keep, and set
+            <code className="mx-1 rounded bg-amber-100 px-1 py-0.5 font-mono text-xs">DATA_DIR</code>
+            to persistent storage before relying on it.
+          </p>
+        ) : null}
 
         {signatures.length === 0 ? (
           <div className="mt-12 rounded-2xl border border-dashed border-ink-200 bg-ink-50/50 px-6 py-16 text-center">

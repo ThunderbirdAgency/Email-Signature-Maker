@@ -12,15 +12,30 @@ import { findUserById, type User } from "./store";
 const COOKIE_NAME = "sig_session";
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
+/**
+ * Whether sessions can be issued at all.
+ *
+ * Signing with a guessable secret in production would let anyone forge a
+ * session, so that is never allowed. Rather than crashing the whole site when
+ * the secret is missing, the sign-in routes report it and anonymous browsing —
+ * which is most of the product — carries on working.
+ */
+export function authConfigured(): boolean {
+  if (process.env.NODE_ENV !== "production") return true;
+  const value = process.env.AUTH_SECRET;
+  return Boolean(value && value.length >= 32);
+}
+
+export const AUTH_SETUP_MESSAGE =
+  "Accounts are not available yet: this deployment has no AUTH_SECRET set. " +
+  "You can still build a signature and copy it.";
+
 function secret(): Uint8Array {
   const value = process.env.AUTH_SECRET;
   if (value && value.length >= 32) return new TextEncoder().encode(value);
 
   if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      "AUTH_SECRET must be set to at least 32 characters in production. " +
-        "Generate one with: openssl rand -hex 32",
-    );
+    throw new Error(AUTH_SETUP_MESSAGE);
   }
   // Development convenience only: sessions reset whenever the server restarts.
   return new TextEncoder().encode("dev-only-insecure-secret-do-not-use-in-prod");
@@ -50,6 +65,7 @@ export async function destroySession(): Promise<void> {
 
 /** The signed-in user, or null. Safe to call from any server component. */
 export async function currentUser(): Promise<User | null> {
+  if (!authConfigured()) return null;
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   if (!token) return null;

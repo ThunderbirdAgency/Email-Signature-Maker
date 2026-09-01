@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { createUser, findUserByEmail } from "@/lib/store";
-import { createSession } from "@/lib/session";
+import { createSession, authConfigured, AUTH_SETUP_MESSAGE } from "@/lib/session";
 
 export const runtime = "nodejs";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: Request) {
+  if (!authConfigured()) {
+    return NextResponse.json({ error: AUTH_SETUP_MESSAGE }, { status: 503 });
+  }
+
   const body = await request.json().catch(() => ({}));
   const email = String(body.email ?? "").trim();
   const password = String(body.password ?? "");

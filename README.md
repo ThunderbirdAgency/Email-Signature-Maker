@@ -101,6 +101,30 @@ through its interface, and nothing else needs to change.
 
 ---
 
+## Deploying
+
+The app builds and runs anywhere Next.js does. Two environment variables decide
+how much of it works:
+
+| Set this | To get |
+| --- | --- |
+| nothing | The marketing site, all templates, the full editor, live preview, copy/download and the install guides. Sign-up returns a clear "not available" message. |
+| `AUTH_SECRET` | Accounts, saved signatures, share links and image uploads. |
+| `DATA_DIR` | Durable storage. Without it on a serverless host, data goes to the temp directory and disappears — the dashboard says so. |
+
+### Vercel
+
+Import the repo, then add `AUTH_SECRET` (`openssl rand -hex 32`) under Settings →
+Environment Variables and redeploy.
+
+Vercel's filesystem is read-only apart from `/tmp`, so accounts and uploads work
+but do not persist. For anything real, replace `src/lib/store.ts` with a database
+and object-store implementation — every call site already goes through its
+interface — or run the app on a host with a persistent disk and point `DATA_DIR`
+at it.
+
+---
+
 ## Scripts
 
 | Command | What it does |
