@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { getSignature } from "@/lib/store";
 import { renderVCard } from "@/lib/signature/render";
+import { canExport } from "@/lib/billing";
 
 export const runtime = "nodejs";
 
@@ -13,6 +14,9 @@ export async function GET(
   const { id } = await params;
   const signature = await getSignature(id);
   if (!signature) return new NextResponse("Not found", { status: 404 });
+  if (!canExport(signature)) {
+    return new NextResponse("This signature has not been unlocked.", { status: 402 });
+  }
 
   const filename = (signature.details.fullName || "contact")
     .replace(/[^A-Za-z0-9 _-]/g, "")

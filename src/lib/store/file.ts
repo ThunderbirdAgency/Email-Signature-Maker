@@ -13,13 +13,43 @@ import crypto from "node:crypto";
 import type { Signature, SignatureDraft } from "../signature/types";
 import {
   hashPassword, isSafeUploadId, newId, newSlug, normaliseEmail,
-  type StoreDriver, type UploadMeta, type User,
+  type CreditBalance, type StoreDriver, type UploadMeta, type User,
 } from "./shared";
+import { BONUS_CREDITS, BONUS_THRESHOLD, BONUS_WINDOW_MONTHS } from "../billing";
+
+interface LedgerEntry {
+  id: string;
+  userId: string;
+  delta: number;
+  reason: "purchase" | "bonus" | "unlock" | "adjustment";
+  signatureId?: string;
+  purchaseId?: string;
+  stripeSessionId?: string;
+  createdAt: string;
+}
 
 interface Database {
   users: User[];
   signatures: Signature[];
   uploads: UploadMeta[];
+  ledger: LedgerEntry[];
+}
+
+function windowStart(): number {
+  const from = new Date();
+  from.setMonth(from.getMonth() - BONUS_WINDOW_MONTHS);
+  return from.getTime();
+}
+
+function summarise(entries: LedgerEntry[], userId: string): CreditBalance {
+  const mine = entries.filter((e) => e.userId === userId);
+  const since = windowStart();
+  const inWindow = mine.filter((e) => new Date(e.createdAt).getTime() > since);
+  return {
+    balance: mine.reduce((total, e) => total + e.delta, 0),
+    paidInWindow: inWindow.filter((e) => e.reason === "purchase").reduce((t, e) => t + e.delta, 0),
+    bonusGranted: inWindow.some((e) => e.reason === "bonus"),
+  };
 }
 
 /**
@@ -59,9 +89,10 @@ async function readDb(): Promise<Database> {
       users: parsed.users ?? [],
       signatures: parsed.signatures ?? [],
       uploads: parsed.uploads ?? [],
+      ledger: parsed.ledger ?? [],
     };
   } catch {
-    return { users: [], signatures: [], uploads: [] };
+    return { users: [], signatures: [], uploads: [], ledger: [] };
   }
 }
 
@@ -181,6 +212,53 @@ export const fileDriver: StoreDriver = {
   async countSignatures(ownerId) {
     const db = await readDb();
     return db.signatures.filter((s) => s.ownerId === ownerId).length;
+  },
+
+  async creditBalance(userId) {
+    const db = await readDb();
+    return summarise(db.ledger, userId);
+  },
+
+  async recordPurchase({ userId, stripeSessionId, credits, amountCents: _amountCents, currency: _currency }) {
+    return mutate((db) => {
+      // Idempotent on the Stripe session, the same as the Postgres driver:
+      // a retried webhook must never credit an account twice.
+      if (db.ledger.some((e) => e.stripeSessionId === stripeSessionId)) return null;
+
+      const purchaseId = newId("pur");
+      const now = new Date().toISOString();
+      db.ledger.push({
+        id: newId("led"), userId, delta: credits, reason: "purchase",
+        purchaseId, stripeSessionId, createdAt: now,
+      });
+
+      const { paidInWindow, bonusGranted } = summarise(db.ledger, userId);
+      let bonus = 0;
+      if (!bonusGranted && paidInWindow >= BONUS_THRESHOLD) {
+        bonus = BONUS_CREDITS;
+        db.ledger.push({
+          id: newId("led"), userId, delta: bonus, reason: "bonus", purchaseId, createdAt: now,
+        });
+      }
+      return { granted: credits, bonus };
+    });
+  },
+
+  async unlockSignature(signatureId, userId) {
+    return mutate((db) => {
+      if (summarise(db.ledger, userId).balance < 1) return false;
+      const signature = db.signatures.find(
+        (s) => s.id === signatureId && s.ownerId === userId && !s.paid,
+      );
+      if (!signature) return false;
+      signature.paid = true;
+      signature.paidAt = new Date().toISOString();
+      db.ledger.push({
+        id: newId("led"), userId, delta: -1, reason: "unlock",
+        signatureId, createdAt: new Date().toISOString(),
+      });
+      return true;
+    });
   },
 
   async saveUpload(data, contentType, ownerId, extension) {

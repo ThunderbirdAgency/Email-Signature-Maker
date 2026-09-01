@@ -16,6 +16,14 @@ export interface User {
   createdAt: string;
 }
 
+export interface CreditBalance {
+  /** Spendable credits: everything granted minus everything used. */
+  balance: number;
+  /** Paid credits bought inside the bonus window, which drive the bonus. */
+  paidInWindow: number;
+  bonusGranted: boolean;
+}
+
 export interface UploadMeta {
   id: string;
   ownerId: string | null;
@@ -41,6 +49,28 @@ export interface StoreDriver {
   updateSignature(id: string, ownerId: string, draft: SignatureDraft): Promise<Signature | null>;
   deleteSignature(id: string, ownerId: string): Promise<boolean>;
   countSignatures(ownerId: string): Promise<number>;
+
+  /** Spendable credits and progress toward the volume bonus. */
+  creditBalance(userId: string): Promise<CreditBalance>;
+  /**
+   * Record a completed Stripe payment and grant its credits.
+   *
+   * Must be idempotent on `stripeSessionId`: Stripe retries webhooks, and
+   * crediting an account twice for one payment is the worst bug this code
+   * could have. Returns null when the session was already recorded.
+   */
+  recordPurchase(input: {
+    userId: string;
+    stripeSessionId: string;
+    credits: number;
+    amountCents: number;
+    currency: string;
+  }): Promise<{ granted: number; bonus: number } | null>;
+  /**
+   * Spend one credit to unlock a signature for export. Returns false when the
+   * balance is empty or the signature is not the user's.
+   */
+  unlockSignature(signatureId: string, userId: string): Promise<boolean>;
 
   saveUpload(data: Buffer, contentType: string, ownerId: string | null, extension: string): Promise<UploadMeta>;
   readUpload(id: string): Promise<{ data: Buffer; meta: UploadMeta } | null>;

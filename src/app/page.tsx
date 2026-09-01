@@ -10,7 +10,7 @@ import { renderSignatureHtml } from "@/lib/signature/render";
 import { MAIL_CLIENTS } from "@/lib/guides";
 import { TEMPLATES } from "@/lib/signature/templates";
 import { NETWORKS } from "@/lib/signature/networks";
-import { billingEnabled, formatPrice } from "@/lib/billing";
+import { billingEnabled, formatPrice, PRICE_PER_SIGNATURE_CENTS } from "@/lib/billing";
 
 export default async function HomePage() {
   const [user, origin] = await Promise.all([currentUser(), resolveOrigin()]);
@@ -73,7 +73,7 @@ export default async function HomePage() {
 
               <p className="mt-5 text-sm text-ink-400">
                 {billingEnabled()
-                  ? `${formatPrice()} per signature, paid once. Free to build and preview — you only pay to take it away.`
+                  ? `${formatPrice(PRICE_PER_SIGNATURE_CENTS)} per signature, paid once. Free to build and preview — you only pay to take it away.`
                   : "Free while we are in preview. No account needed to build and copy one."}
               </p>
             </div>

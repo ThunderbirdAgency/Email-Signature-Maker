@@ -31,7 +31,9 @@ npm start
 | `NEXT_PUBLIC_APP_URL` | in production | The public origin, e.g. `https://sig.example.com`. Every image inside a signature is hot-linked from here by the recipient's mail client, so it must be publicly reachable. Falls back to the request's own host. |
 | `DATABASE_URL` | for durable data | Postgres connection string. Set it and the app stores everything in Postgres; leave it unset and it falls back to the filesystem. |
 | `DATA_DIR` | no | Where the filesystem fallback keeps its data. Defaults to `./.data`. |
-| `BILLING_ENABLED` | no | `false` (default) makes every feature free for everyone. `true` turns the same feature list into a paywall. |
+| `BILLING_ENABLED` | no | `false` (default) makes everything free. `true` engages the paywall — but only when the Stripe keys below are also set. |
+| `STRIPE_SECRET_KEY` | for payments | Stripe secret key. |
+| `STRIPE_WEBHOOK_SECRET` | for payments | Signing secret for `/api/webhooks/stripe`. |
 
 ---
 
@@ -86,8 +88,16 @@ circular photo becomes a square in Outlook, and everything stays readable.
 
 Uploads go through `sharp`: re-encoded (which strips EXIF and any embedded
 payload), capped at 1200px, and given a content type the server chose rather
-than one the client claimed. Animated GIFs keep their animation. Each upload is
-served from `/i/<id>` with a long immutable cache.
+than one the client claimed. Format is chosen by content — transparency means a
+logo, so PNG; anything else is a photograph, so JPEG, because encoding a photo
+as PNG can multiply its size several times over.
+
+`/i/<id>` serves the original; `/i/<id>?w=N` serves a variant scaled to N
+pixels, cached immutably. The renderer always asks for twice the display width.
+This matters more than it sounds: a 1200px headshot shown at 90px was being
+downloaded in full by every recipient of every email. Right-sizing takes that
+from megabytes to a couple of kilobytes per open, and bandwidth is the only
+cost in this service that scales with usage.
 
 Because that URL has to be publicly fetchable for a signature to work, **anyone
 holding the URL can view the image**. Uploads are unguessable but not private.
@@ -142,6 +152,39 @@ Import the repo and set both variables under Settings → Environment Variables:
 Then redeploy. Without `DATABASE_URL` the app still runs, but Vercel's
 filesystem is read-only apart from `/tmp`, so saved data disappears and the
 dashboard says so.
+
+---
+
+## Payments
+
+$10 per signature, paid once. Building, previewing and switching templates is
+free; a credit is spent to unlock export — copy, download, share link and
+vCard. Buying 5 within a rolling 12 months adds 10 more free, so an office
+costs $50 rather than $150. The bonus is evaluated across the window, so five
+separate purchases earn it exactly like one purchase of five, and it is granted
+once per window.
+
+Credits are an append-only ledger (`smartstamp.credit_ledger`) rather than a
+balance column: the balance is `sum(delta)`, which cannot be corrupted by two
+writes racing, and every movement stays auditable. Spending locks the user row
+first, so two tabs cannot both spend the last credit.
+
+Credits are granted **only** by the Stripe webhook, never by the browser
+returning from checkout — a success URL can be replayed or forged. The handler
+verifies Stripe's signature over the raw body and is idempotent on the checkout
+session id, so a retried webhook grants nothing twice.
+
+### Setting Stripe up
+
+1. Copy your secret key into `STRIPE_SECRET_KEY`.
+2. Add a webhook endpoint pointing at `https://your-domain/api/webhooks/stripe`,
+   subscribed to `checkout.session.completed`. Put its signing secret into
+   `STRIPE_WEBHOOK_SECRET`.
+3. Set `BILLING_ENABLED=true` and redeploy.
+
+There is no Stripe Product or Price to create: the line item is built from
+`PRICE_PER_SIGNATURE_CENTS` at checkout, so the price on the page and the price
+charged cannot drift apart.
 
 ---
 

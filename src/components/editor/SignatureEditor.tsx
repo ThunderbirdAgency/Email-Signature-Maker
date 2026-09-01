@@ -37,12 +37,21 @@ export function SignatureEditor({
   shareSlug,
   origin,
   signedIn,
+  billing,
 }: {
   initialDraft: SignatureDraft;
   signatureId: string | null;
   shareSlug: string | null;
   origin: string;
   signedIn: boolean;
+  billing: {
+    enabled: boolean;
+    paid: boolean;
+    balance: number;
+    price: string;
+    packQuantity: number;
+    bonusCredits: number;
+  };
 }) {
   const router = useRouter();
   const api = useSignatureDraft(initialDraft);
@@ -54,6 +63,8 @@ export function SignatureEditor({
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [mobileView, setMobileView] = useState<"edit" | "preview">("edit");
+  // Unlocking happens without a reload, so the export panel opens immediately.
+  const [paid, setPaid] = useState(billing.paid);
   const restoredRef = useRef(false);
 
   /**
@@ -279,6 +290,11 @@ export function SignatureEditor({
             savedId={savedId}
             isEmpty={isEmpty}
             onLoadExample={loadExample}
+            billing={{ ...billing, paid }}
+            onUnlocked={() => {
+              setPaid(true);
+              router.refresh();
+            }}
           />
         </div>
       </div>

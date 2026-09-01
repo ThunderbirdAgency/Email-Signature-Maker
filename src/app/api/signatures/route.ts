@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
 
-  if ((await countSignatures(user.id)) >= signatureLimit(user)) {
+  if ((await countSignatures(user.id)) >= signatureLimit()) {
     return NextResponse.json({ error: "Signature limit reached." }, { status: 402 });
   }
 

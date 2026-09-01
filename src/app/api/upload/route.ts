@@ -49,7 +49,9 @@ export async function POST(request: Request) {
         .toBuffer();
       contentType = "image/gif";
       extension = ".gif";
-    } else {
+    } else if (meta.hasAlpha) {
+      // Transparency means a logo or a cut-out, where PNG is the right format
+      // and the flat colour compresses well.
       output = await sharp(input)
         .rotate()
         .resize({ width: MAX_DIMENSION, height: MAX_DIMENSION, fit: "inside", withoutEnlargement: true })
@@ -57,6 +59,17 @@ export async function POST(request: Request) {
         .toBuffer();
       contentType = "image/png";
       extension = ".png";
+    } else {
+      // Everything else is a photograph. Encoding one as PNG can multiply its
+      // size several times over, and every recipient of every email pays that
+      // cost on download.
+      output = await sharp(input)
+        .rotate()
+        .resize({ width: MAX_DIMENSION, height: MAX_DIMENSION, fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 82, mozjpeg: true })
+        .toBuffer();
+      contentType = "image/jpeg";
+      extension = ".jpg";
     }
 
     const saved = await saveUpload(output, contentType, user?.id ?? null, extension);

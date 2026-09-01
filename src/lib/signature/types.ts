@@ -179,6 +179,9 @@ export interface Addons {
 
 export interface Signature {
   id: string;
+  /** True once a credit has been spent to unlock export. */
+  paid?: boolean;
+  paidAt?: string | null;
   name: string;
   ownerId: string | null;
   /** Short public slug for the share page, e.g. /s/ab12cd. */

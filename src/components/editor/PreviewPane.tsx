@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ScaledSignature } from "@/components/ScaledSignature";
 import { MAIL_CLIENTS } from "@/lib/guides";
+import { UnlockPanel } from "./UnlockPanel";
 import { estimateSize, renderPlainText, renderStandaloneHtml } from "@/lib/signature/render";
 import type { Signature } from "@/lib/signature/types";
 
@@ -21,6 +22,8 @@ export function PreviewPane({
   savedId,
   isEmpty,
   onLoadExample,
+  billing,
+  onUnlocked,
 }: {
   signature: Signature;
   html: string;
@@ -29,6 +32,15 @@ export function PreviewPane({
   savedId: string | null;
   isEmpty: boolean;
   onLoadExample: () => void;
+  billing: {
+    enabled: boolean;
+    paid: boolean;
+    balance: number;
+    price: string;
+    packQuantity: number;
+    bonusCredits: number;
+  };
+  onUnlocked: () => void;
 }) {
   const [device, setDevice] = useState<Device>("desktop");
   const [showSource, setShowSource] = useState(false);
@@ -183,7 +195,23 @@ export function PreviewPane({
         ) : null}
 
         <div className="mx-auto mt-6 max-w-2xl space-y-3">
-          <div className="rounded-xl border border-ink-200 bg-white p-4">
+          {billing.enabled && !billing.paid ? (
+            <UnlockPanel
+              signatureId={savedId}
+              balance={billing.balance}
+              price={billing.price}
+              packQuantity={billing.packQuantity}
+              bonusCredits={billing.bonusCredits}
+              onUnlocked={onUnlocked}
+            />
+          ) : null}
+
+          <div
+            className={`rounded-xl border border-ink-200 bg-white p-4 ${
+              billing.enabled && !billing.paid ? "pointer-events-none opacity-40" : ""
+            }`}
+            aria-hidden={billing.enabled && !billing.paid}
+          >
             <h3 className="text-sm font-semibold text-ink-900">Get your signature</h3>
             <div className="mt-3 flex flex-wrap gap-2">
               <button

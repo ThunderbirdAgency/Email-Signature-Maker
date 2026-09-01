@@ -65,6 +65,19 @@ export function link(href: string, label: string, sig: Signature, extra = ""): s
 /* Images                                                                      */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Ask an uploaded image for a variant sized to how it will actually be shown.
+ *
+ * Only applies to images this service hosts; a URL the user pasted from
+ * elsewhere is left exactly as they gave it.
+ */
+function sizedUrl(url: string, displayWidth: number): string {
+  if (!/\/i\/[A-Za-z0-9]+\.[a-z0-9]+/i.test(url)) return url;
+  if (url.includes("?")) return url;
+  // Twice the display width keeps it sharp on a retina screen.
+  return `${url}?w=${Math.min(1200, Math.max(16, Math.round(displayWidth * 2)))}`;
+}
+
 function radiusFor(spec: ImageSpec): string {
   if (spec.shape === "circle") return `border-radius:${Math.round(spec.width / 2)}px;`;
   if (spec.shape === "rounded") return "border-radius:10px;";
@@ -78,7 +91,7 @@ export function image(spec: ImageSpec | null, sig: Signature): string {
       ? `border:${spec.borderWidth}px solid ${spec.borderColor || sig.style.primaryColor};`
       : "border:0;";
   const img =
-    `<img src="${escUrl(spec.url)}" width="${spec.width}" alt="${esc(spec.alt || "")}" ` +
+    `<img src="${escUrl(sizedUrl(spec.url, spec.width))}" width="${spec.width}" alt="${esc(spec.alt || "")}" ` +
     `style="display:block;width:${spec.width}px;max-width:${spec.width}px;height:auto;` +
     `outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;${border}${radiusFor(spec)}" />`;
   return spec.link ? `<a href="${escUrl(spec.link)}" target="_blank" style="text-decoration:none;">${img}</a>` : img;
@@ -319,7 +332,7 @@ export function bannerBlock(sig: Signature): string {
   const b = sig.addons.banner;
   if (!b.enabled || !b.imageUrl) return "";
   const img =
-    `<img src="${escUrl(b.imageUrl)}" width="${b.width}" alt="${esc(b.alt || "")}" ` +
+    `<img src="${escUrl(sizedUrl(b.imageUrl, b.width))}" width="${b.width}" alt="${esc(b.alt || "")}" ` +
     `style="display:block;width:${b.width}px;max-width:100%;height:auto;border:0;border-radius:8px;outline:none;" />`;
   return b.link ? `<a href="${escUrl(b.link)}" target="_blank" style="text-decoration:none;">${img}</a>` : img;
 }

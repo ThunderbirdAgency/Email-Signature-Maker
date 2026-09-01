@@ -3,19 +3,24 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { currentUser } from "@/lib/session";
-import { billingEnabled, formatPrice } from "@/lib/billing";
+import {
+  BONUS_CREDITS, BONUS_THRESHOLD, BONUS_WINDOW_MONTHS, PRICE_PER_SIGNATURE_CENTS,
+  billingEnabled, creditsFor, formatPrice, priceFor,
+} from "@/lib/billing";
 import { TEMPLATES } from "@/lib/signature/templates";
 import { NETWORKS } from "@/lib/signature/networks";
 
 export const metadata: Metadata = {
   title: "Pricing",
-  description: `One signature, ${formatPrice()}. No subscription — you pay once for the signature you actually use.`,
+  description: `One signature, ${formatPrice(PRICE_PER_SIGNATURE_CENTS)}. No subscription — you pay once for the signature you actually use.`,
 };
 
 export default async function PricingPage() {
   const user = await currentUser();
   const gated = billingEnabled();
-  const price = formatPrice();
+  const price = formatPrice(PRICE_PER_SIGNATURE_CENTS);
+  const pack = formatPrice(priceFor(BONUS_THRESHOLD));
+  const packCredits = creditsFor(BONUS_THRESHOLD);
 
   return (
     <>
@@ -32,13 +37,13 @@ export default async function PricingPage() {
             </h1>
             <p className="mt-4 text-base leading-relaxed text-ink-500 sm:text-[17px]">
               {gated
-                ? "No subscription. Build it, see exactly what you are getting, and pay once for the signature you decide to use. Come back and edit it whenever you like — the same signature stays yours."
-                : `Everything is switched on for everyone while we are in preview. The plan is ${price} per signature once that changes.`}
+                ? `No subscription. Build it, see exactly what you are getting, and pay once for the signature you keep. Buy ${BONUS_THRESHOLD} in a year and ${BONUS_CREDITS} more are added free — ${pack} for a whole office.`
+                : `Everything is switched on for everyone while we are in preview. The plan is ${price} per signature, with ${BONUS_THRESHOLD} bought in a year earning ${BONUS_CREDITS} more free.`}
             </p>
           </div>
 
           {/* The stamp is the unit of purchase, so the price sits on one. */}
-          <div className="mx-auto mt-14 max-w-md">
+          <div className="mx-auto mt-14 grid max-w-3xl gap-10 md:grid-cols-2">
             <div className="stamp shadow-[0_4px_24px_rgba(15,23,42,0.10)]" style={{ ["--perf" as string]: "#ffffff" }}>
               <span className="stamp-sides" aria-hidden="true" />
               <div className="relative px-8 py-10 text-center">
@@ -90,6 +95,64 @@ export default async function PricingPage() {
                 </p>
               </div>
             </div>
+
+            {/* The office pack. Same price per signature, three times as many. */}
+            <div
+              className="stamp shadow-[0_4px_24px_rgba(15,23,42,0.10)] ring-1 ring-brand-200"
+              style={{ ["--perf" as string]: "#ffffff" }}
+            >
+              <span className="stamp-sides" aria-hidden="true" />
+              <div className="relative px-8 py-10 text-center">
+                <span
+                  className="postmark pointer-events-none absolute right-5 top-5 flex h-16 w-16 items-center justify-center text-[8px] font-bold uppercase leading-tight tracking-wider text-brand-600"
+                  aria-hidden="true"
+                >
+                  Best
+                  <br />
+                  Value
+                </span>
+
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">
+                  Office pack
+                </p>
+                <p className="mt-3 flex items-baseline justify-center gap-1.5">
+                  <span className="text-6xl font-semibold tracking-tight text-ink-900">
+                    {gated ? pack : "Free"}
+                  </span>
+                  {gated ? <span className="text-sm text-ink-400">once</span> : null}
+                </p>
+                <p className="mt-3 text-sm font-medium text-ink-700">
+                  {packCredits.total} signatures — buy {packCredits.paid}, get {packCredits.bonus} free
+                </p>
+
+                <ul className="mt-8 space-y-3 text-left">
+                  {[
+                    `Everything in a single signature, ${packCredits.total} times over`,
+                    `Works out at ${formatPrice(Math.round(priceFor(BONUS_THRESHOLD) / packCredits.total))} each`,
+                    `Buy them one at a time — ${BONUS_THRESHOLD} in any ${BONUS_WINDOW_MONTHS} months earns the bonus`,
+                    "Credits sit in your account until you use them",
+                    "Give each person their own look and colours",
+                  ].map((feature) => (
+                    <li key={feature} className="flex gap-2.5 text-sm text-ink-600">
+                      <span className="mt-0.5 shrink-0 text-brand-600" aria-hidden="true">
+                        &#10003;
+                      </span>
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+
+                <Link
+                  href="/app/editor/new"
+                  className="mt-9 block rounded-lg bg-ink-900 px-5 py-3.5 text-center text-sm font-semibold text-white transition hover:bg-ink-800"
+                >
+                  Kit out the office
+                </Link>
+                <p className="mt-3 text-xs text-ink-400">
+                  The bonus lands automatically when you cross {BONUS_THRESHOLD}.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -122,6 +185,10 @@ function faq(price: string, gated: boolean) {
       a: gated
         ? `One signature, ${price}, once. Building it, previewing it and trying all the templates costs nothing — you pay when you want to copy, download or share it. Need a second signature for another role or brand? That is another ${price}.`
         : `Nothing, currently. The intended model is ${price} per signature: free to build and preview, paid when you export it.`,
+    },
+    {
+      q: `How does the ${BONUS_CREDITS}-free deal work?`,
+      a: `Buy ${BONUS_THRESHOLD} signatures within any ${BONUS_WINDOW_MONTHS} months and ${BONUS_CREDITS} more are added to your account free — ${BONUS_THRESHOLD + BONUS_CREDITS} in total. It does not have to be one purchase: five separate ones across the year count the same. The bonus lands once per ${BONUS_WINDOW_MONTHS}-month window, and unused credits just sit in your account until you need them.`,
     },
     {
       q: "Do I have to pay again to change it?",

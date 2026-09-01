@@ -8,6 +8,7 @@ import { currentUser } from "@/lib/session";
 import { resolveOrigin } from "@/lib/origin";
 import { getSignatureBySlug } from "@/lib/store";
 import { renderPlainText, renderSignatureHtml } from "@/lib/signature/render";
+import { canExport } from "@/lib/billing";
 
 export async function generateMetadata({
   params,
@@ -38,6 +39,31 @@ export default async function SharedSignaturePage({
     resolveOrigin(),
   ]);
   if (!signature) notFound();
+
+  // A share link is an export route like any other.
+  if (!canExport(signature)) {
+    return (
+      <>
+        <SiteHeader user={user} variant="light" />
+        <main className="mx-auto max-w-2xl px-5 py-24 text-center sm:px-8">
+          <h1 className="text-2xl font-semibold tracking-tight text-ink-900">
+            This signature is not ready to share yet
+          </h1>
+          <p className="mt-3 text-[15px] leading-relaxed text-ink-500">
+            Its owner has not unlocked it. Once they do, this link will show the
+            signature and let you copy it.
+          </p>
+          <Link
+            href="/app/editor/new"
+            className="mt-8 inline-block rounded-lg bg-brand-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-500"
+          >
+            Build your own
+          </Link>
+        </main>
+        <SiteFooter />
+      </>
+    );
+  }
 
   const html = renderSignatureHtml(signature, { origin });
   const plain = renderPlainText(signature);

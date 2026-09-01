@@ -14,8 +14,9 @@ import postgres from "postgres";
 import type { Signature, SignatureDraft } from "../signature/types";
 import {
   hashPassword, isSafeUploadId, newId, newSlug, normaliseEmail,
-  type StoreDriver, type UploadMeta, type User,
+  type CreditBalance, type StoreDriver, type UploadMeta, type User,
 } from "./shared";
+import { BONUS_CREDITS, BONUS_THRESHOLD, BONUS_WINDOW_MONTHS } from "../billing";
 
 /**
  * A signature draft is plain serialisable data by construction, but the
@@ -66,6 +67,8 @@ interface SignatureRow {
   slug: string;
   name: string;
   document: SignatureDraft;
+  paid: boolean;
+  paid_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -89,10 +92,14 @@ function toSignature(row: SignatureRow): Signature {
     ownerId: row.owner_id,
     slug: row.slug,
     name: row.name,
+    paid: row.paid,
+    paidAt: row.paid_at ? row.paid_at.toISOString() : null,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
 }
+
+const WINDOW = `${BONUS_WINDOW_MONTHS} months`;
 
 export const postgresDriver: StoreDriver = {
   ephemeral: false,
@@ -191,6 +198,106 @@ export const postgresDriver: StoreDriver = {
       select count(*)::text as count from smartstamp.signatures where owner_id = ${ownerId}
     `;
     return Number(rows[0]?.count ?? 0);
+  },
+
+  async creditBalance(userId) {
+    const rows = await sql()<{ balance: string; paid_in_window: string; bonus_grants: string }[]>`
+      select
+        coalesce(sum(delta), 0)::text as balance,
+        coalesce(sum(delta) filter (
+          where reason = 'purchase' and created_at > now() - ${WINDOW}::interval
+        ), 0)::text as paid_in_window,
+        count(*) filter (
+          where reason = 'bonus' and created_at > now() - ${WINDOW}::interval
+        )::text as bonus_grants
+      from smartstamp.credit_ledger
+      where user_id = ${userId}
+    `;
+    const row = rows[0];
+    return {
+      balance: Number(row?.balance ?? 0),
+      paidInWindow: Number(row?.paid_in_window ?? 0),
+      bonusGranted: Number(row?.bonus_grants ?? 0) > 0,
+    } satisfies CreditBalance;
+  },
+
+  async recordPurchase({ userId, stripeSessionId, credits, amountCents, currency }) {
+    return sql().begin(async (tx) => {
+      const purchaseId = newId("pur");
+      // The unique index on stripe_session_id is what makes a retried webhook
+      // a no-op; nothing is granted when this insert finds an existing row.
+      const inserted = await tx`
+        insert into smartstamp.purchases (id, user_id, stripe_session_id, credits, amount_cents, currency)
+        values (${purchaseId}, ${userId}, ${stripeSessionId}, ${credits}, ${amountCents}, ${currency})
+        on conflict (stripe_session_id) do nothing
+        returning id
+      `;
+      if (!inserted[0]) return null;
+
+      await tx`
+        insert into smartstamp.credit_ledger (id, user_id, delta, reason, purchase_id)
+        values (${newId("led")}, ${userId}, ${credits}, 'purchase', ${purchaseId})
+      `;
+
+      // Evaluate the volume bonus against everything bought in the window,
+      // so five single purchases earn it exactly like one purchase of five.
+      const totals = await tx<{ paid_in_window: string; bonus_grants: string }[]>`
+        select
+          coalesce(sum(delta) filter (
+            where reason = 'purchase' and created_at > now() - ${WINDOW}::interval
+          ), 0)::text as paid_in_window,
+          count(*) filter (
+            where reason = 'bonus' and created_at > now() - ${WINDOW}::interval
+          )::text as bonus_grants
+        from smartstamp.credit_ledger
+        where user_id = ${userId}
+      `;
+      const paidInWindow = Number(totals[0]?.paid_in_window ?? 0);
+      const alreadyBonused = Number(totals[0]?.bonus_grants ?? 0) > 0;
+
+      let bonus = 0;
+      if (!alreadyBonused && paidInWindow >= BONUS_THRESHOLD) {
+        bonus = BONUS_CREDITS;
+        await tx`
+          insert into smartstamp.credit_ledger (id, user_id, delta, reason, purchase_id)
+          values (${newId("led")}, ${userId}, ${bonus}, 'bonus', ${purchaseId})
+        `;
+      }
+
+      return { granted: credits, bonus };
+    });
+  },
+
+  async unlockSignature(signatureId, userId) {
+    return sql().begin(async (tx) => {
+      // Take a row lock on the user first, so two tabs cannot both read the
+      // same balance and each spend the last credit. Postgres refuses FOR
+      // UPDATE on an aggregate, so the user row is what gets locked and the
+      // balance is summed underneath it.
+      await tx`select id from smartstamp.users where id = ${userId} for update`;
+
+      const rows = await tx<{ balance: string }[]>`
+        select coalesce(sum(delta), 0)::text as balance
+        from smartstamp.credit_ledger
+        where user_id = ${userId}
+      `;
+      if (Number(rows[0]?.balance ?? 0) < 1) return false;
+
+      const updated = await tx`
+        update smartstamp.signatures
+        set paid = true, paid_at = now()
+        where id = ${signatureId} and owner_id = ${userId} and paid = false
+        returning id
+      `;
+      // Already paid, or not this user's: spend nothing.
+      if (!updated[0]) return false;
+
+      await tx`
+        insert into smartstamp.credit_ledger (id, user_id, delta, reason, signature_id)
+        values (${newId("led")}, ${userId}, -1, 'unlock', ${signatureId})
+      `;
+      return true;
+    });
   },
 
   async saveUpload(data, contentType, ownerId, extension) {

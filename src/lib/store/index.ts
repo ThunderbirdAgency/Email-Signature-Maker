@@ -16,7 +16,7 @@ import type { StoreDriver } from "./shared";
 
 const driver: StoreDriver = process.env.DATABASE_URL ? postgresDriver : fileDriver;
 
-export type { User, UploadMeta } from "./shared";
+export type { User, UploadMeta, CreditBalance } from "./shared";
 export { hashPassword, verifyPassword, newId, newSlug } from "./shared";
 
 /** Which backend is live, for diagnostics and the storage warning. */
@@ -41,6 +41,10 @@ export const createSignature: StoreDriver["createSignature"] = (...a) => driver.
 export const updateSignature: StoreDriver["updateSignature"] = (...a) => driver.updateSignature(...a);
 export const deleteSignature: StoreDriver["deleteSignature"] = (...a) => driver.deleteSignature(...a);
 export const countSignatures: StoreDriver["countSignatures"] = (...a) => driver.countSignatures(...a);
+
+export const creditBalance: StoreDriver["creditBalance"] = (...a) => driver.creditBalance(...a);
+export const recordPurchase: StoreDriver["recordPurchase"] = (...a) => driver.recordPurchase(...a);
+export const unlockSignature: StoreDriver["unlockSignature"] = (...a) => driver.unlockSignature(...a);
 
 export const saveUpload: StoreDriver["saveUpload"] = (...a) => driver.saveUpload(...a);
 export const readUpload: StoreDriver["readUpload"] = (...a) => driver.readUpload(...a);

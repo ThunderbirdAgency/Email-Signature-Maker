@@ -8,7 +8,7 @@ import { currentUser } from "@/lib/session";
 import { resolveOrigin } from "@/lib/origin";
 import { listSignatures, storageIsEphemeral } from "@/lib/store";
 import { renderSignatureHtml } from "@/lib/signature/render";
-import { billingEnabled, formatPrice } from "@/lib/billing";
+import { billingEnabled, formatPrice, PRICE_PER_SIGNATURE_CENTS } from "@/lib/billing";
 import { TEMPLATES } from "@/lib/signature/templates";
 
 export const metadata: Metadata = { title: "My signatures" };
@@ -33,7 +33,7 @@ export default async function DashboardPage() {
               {signatures.length === 0
                 ? "You have not saved a signature yet."
                 : `${signatures.length} saved signature${signatures.length === 1 ? "" : "s"}.`}
-              {billingEnabled() ? ` Building is free; ${formatPrice()} per signature to export.` : ""}
+              {billingEnabled() ? ` Building is free; ${formatPrice(PRICE_PER_SIGNATURE_CENTS)} per signature to export.` : ""}
             </p>
           </div>
           <div className="flex items-center gap-2">
